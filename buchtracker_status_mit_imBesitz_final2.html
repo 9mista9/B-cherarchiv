@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<title>Bücherliste</title>
+<style>
+  body {
+    background-color: #121212;
+    color: #f0f0f0;
+    font-family: Arial, sans-serif;
+    padding: 20px;
+  }
+  h1 {
+    text-align: center;
+  }
+  label, select, input, button {
+    line-height: 1.8em;
+    display: block;
+    margin: 10px 0;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 30px;
+  }
+  th, td {
+    border: 1px solid #333;
+    padding: 8px;
+    text-align: center;
+  }
+  th {
+    background-color: #222;
+  }
+  input, select, button {
+    background-color: #222;
+    color: #f0f0f0;
+    border: 1px solid #444;
+    padding: 5px;
+  }
+  .emoji {
+    font-size: 1.5em;
+    cursor: pointer;
+    filter: grayscale(100%);
+    transition: 0.2s ease;
+    margin-right: 5px;
+  }
+  .emoji:hover {
+    transform: scale(1.2);
+  }
+  .emoji.gelb {
+    filter: none;
+  }
+  .hidden {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div style="text-align: center; margin-bottom: 20px; line-height: 1.8em;">
+  <h1 style="margin: 0;">Bücherverwaltung – Mike</h1>
+  <div id="uhrzeit" style="font-size: 1.6em; font-family: monospace; margin-top: 5px;"></div>
+</div>
+<h2>Buch hinzufügen:</h2>
+<form id="buchForm">
+  <label>ISBN:
+    <input type="text" id="isbn" required />
+  </label>
+  <label>Titel:
+    <input type="text" id="titel" required />
+  </label>
+  <label>Autor:
+    <input type="text" id="autor" required />
+  </label>
+  <label>Status:
+    <select id="status" required>
+      <option value="wird gelesen">Wird gelesen</option>
+      <option value="gelesen" selected>Gelesen</option>
+      <option value="im besitz">Im Besitz</option>
+      <option value="verkauft">Verkauft</option>
+    </select>
+  </label>
+  <label id="preisLabel" class="hidden">Verkaufspreis:
+    <input type="text" id="preis" />
+  </label>
+  <label id="seitenLabel" class="hidden">Aktuelle Seite:
+    <input type="number" id="seite" min="1" />
+  </label>
+  <button type="submit">Buch hinzufügen</button>
+</form>
+
+<table id="buchTabelle">
+  <thead>
+    <tr>
+      <th>ISBN</th>
+      <th>Titel</th>
+      <th>Autor</th>
+      <th>Status</th>
+      <th>Seite</th>
+      <th class="preisSpalte">Preis</th>
+      <th>Bewertung</th>
+      <th>Im Besitz</th>
+      <th>Aktionen</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+  const form = document.getElementById('buchForm');
+  const statusSelect = document.getElementById('status');
+  const seitenLabel = document.getElementById('seitenLabel');
+  const seiteInput = document.getElementById('seite');
+  const preisLabel = document.getElementById('preisLabel');
+  const preisInput = document.getElementById('preis');
+  const tabelle = document.querySelector('#buchTabelle tbody');
+
+  let gespeicherteBuecher = JSON.parse(localStorage.getItem('buecherListe')) || [];
+
+  function speichern() {
+    localStorage.setItem('buecherListe', JSON.stringify(gespeicherteBuecher));
+  }
+
+  function setRating(index, rating) {
+    gespeicherteBuecher[index].bewertung = gespeicherteBuecher[index].bewertung === rating ? null : rating;
+    speichern();
+    zeichneTabelleNeu();
+  }
+
+  function updateStatus(index, neuerStatus) {
+    gespeicherteBuecher[index].status = neuerStatus;
+    speichern();
+    zeichneTabelleNeu();
+  }
+
+  function updateSeite(index, neueSeite) {
+    gespeicherteBuecher[index].seite = neueSeite;
+    speichern();
+  }
+
+  function updatePreis(index, neuerPreis) {
+    gespeicherteBuecher[index].preis = neuerPreis;
+    speichern();
+  }
+
+  function updateIsbn(index, neueIsbn) {
+    gespeicherteBuecher[index].isbn = neueIsbn;
+    speichern();
+  }
+
+  function toggleImBesitz(index, checked) {
+    gespeicherteBuecher[index].imBesitz = checked;
+    speichern();
+    zeichneTabelleNeu();
+  }
+
+  function loescheBuch(index) {
+    gespeicherteBuecher.splice(index, 1);
+    speichern();
+    zeichneTabelleNeu();
+  }
+
+  function addRow(buch, index) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" value="${buch.isbn}" onchange="updateIsbn(${index}, this.value)"></td>
+      <td>${buch.titel}</td>
+      <td>${buch.autor}</td>
+      <td>
+        <select onchange="updateStatus(${index}, this.value)">
+          <option value="wird gelesen" ${buch.status === 'wird gelesen' ? 'selected' : ''}>Wird gelesen</option>
+          <option value="gelesen" ${buch.status === 'gelesen' ? 'selected' : ''}>Gelesen</option>
+          <option value="im besitz" ${buch.status === 'im besitz' ? 'selected' : ''}>Im Besitz</option>
+          <option value="verkauft" ${buch.status === 'verkauft' ? 'selected' : ''}>Verkauft</option>
+        </select>
+      </td>
+      <td>
+        ${buch.status === 'wird gelesen' ? `<input type="number" value="${buch.seite}" min="1" onchange="updateSeite(${index}, this.value)">` : ''}
+      </td>
+      <td class="preisZelle">
+        ${buch.status === 'verkauft' ? `<input type="text" value="${buch.preis}" onchange="updatePreis(${index}, this.value)">` : ''}
+      </td>
+      <td>
+        ${(buch.status === 'gelesen' || buch.imBesitz) ? `
+          <span class="emoji ${buch.bewertung === 'gut' ? 'gelb' : ''}" onclick="setRating(${index}, 'gut')">🙂</span>
+          <span class="emoji ${buch.bewertung === 'neutral' ? 'gelb' : ''}" onclick="setRating(${index}, 'neutral')">😐</span>
+          <span class="emoji ${buch.bewertung === 'schlecht' ? 'gelb' : ''}" onclick="setRating(${index}, 'schlecht')">🙁</span>
+        ` : ''}
+      </td>
+      <td>
+        <input type="checkbox" ${buch.imBesitz ? 'checked' : ''} onchange="toggleImBesitz(${index}, this.checked)">
+      </td>
+      <td><button class="action-button" onclick="loescheBuch(${index})">🗑️</button></td>
+    `;
+    tabelle.appendChild(row);
+  }
+
+  function zeichneTabelleNeu() {
+    tabelle.innerHTML = '';
+    gespeicherteBuecher.sort((a, b) => a.titel.localeCompare(b.titel));
+    gespeicherteBuecher.forEach((buch, i) => addRow(buch, i));
+  }
+
+  statusSelect.addEventListener('change', () => {
+    if (statusSelect.value === 'wird gelesen') {
+      seitenLabel.classList.remove('hidden');
+      preisLabel.classList.add('hidden');
+    } else if (statusSelect.value === 'verkauft') {
+      preisLabel.classList.remove('hidden');
+      seitenLabel.classList.add('hidden');
+    } else {
+      seitenLabel.classList.add('hidden');
+      preisLabel.classList.add('hidden');
+    }
+  });
+
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const buch = {
+      isbn: document.getElementById('isbn').value,
+      titel: document.getElementById('titel').value,
+      autor: document.getElementById('autor').value,
+      status: statusSelect.value,
+      seite: statusSelect.value === 'wird gelesen' ? seiteInput.value : '-',
+      preis: statusSelect.value === 'verkauft' ? preisInput.value : '-',
+      bewertung: null,
+      imBesitz: false
+    };
+    gespeicherteBuecher.push(buch);
+    speichern();
+    zeichneTabelleNeu();
+    form.reset();
+    seitenLabel.classList.add('hidden');
+    preisLabel.classList.add('hidden');
+  });
+
+  zeichneTabelleNeu();
+
+  function updateUhrzeit() {
+    const jetzt = new Date();
+    const formatter = new Intl.DateTimeFormat('de-DE', {
+      weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+    document.getElementById('uhrzeit').textContent = formatter.format(jetzt);
+  }
+  setInterval(updateUhrzeit, 1000);
+  updateUhrzeit();
+</script>
+</body>
+</html>
